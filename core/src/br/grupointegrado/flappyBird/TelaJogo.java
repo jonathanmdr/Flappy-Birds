@@ -38,6 +38,8 @@ public class TelaJogo extends TelaBase {
 
         initChao();
         initPassaro();
+
+        new Obstaculo(mundo, camera, null);
     }
 
     private void initChao() {
@@ -102,10 +104,8 @@ public class TelaJogo extends TelaBase {
      * Atualiza a posição do chão para acompanhar o pássaro.
      */
     private void atualizarChao() {
-        float largura = camera.viewportWidth / Util.PIXEL_METRO;
-        Vector2 posicao = chao.getPosition();
-        posicao.x = largura / 2;
-        chao.setTransform(posicao, 0);
+        Vector2 posicao = passaro.getCorpo().getPosition();
+        chao.setTransform(posicao.x, 0, 0);
     }
 
     @Override
@@ -117,7 +117,7 @@ public class TelaJogo extends TelaBase {
 
     /**
      *
-     *  Configura o tamanho do chão de caordo com o tamanho da tela
+     *  Configura o tamanho do chão de acordo com o tamanho da tela
      *
      */
     private void redimensionaChao() {
