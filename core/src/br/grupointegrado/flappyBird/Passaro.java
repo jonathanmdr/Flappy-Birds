@@ -5,8 +5,6 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
-import com.badlogic.gdx.physics.box2d.CircleShape;
-import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.World;
 
@@ -49,8 +47,29 @@ public class Passaro {
      * Atualiza o comportamento do passaro
      * @param delta
      */
-    public void atualizar(float delta){
-        atualizarVelocidade();
+    public void atualizar(float delta, boolean movimentar){
+        if (movimentar) {
+            atualizarVelocidade();
+            atualizarRotacao();
+        }
+    }
+
+    private void atualizarRotacao() {
+        float velocidadeY = corpo.getLinearVelocity().y;
+        float rotacao = 0;
+
+        if(velocidadeY < 0){
+            //Caindo
+            rotacao = -15;
+        } else if(velocidadeY > 0){
+            //Subindo
+            rotacao = 10;
+        } else{
+            //Reto
+            rotacao = 0;
+        }
+        rotacao = (float) Math.toRadians(rotacao); //Convertendo Graus para Radianos
+        corpo.setTransform(corpo.getPosition(), rotacao);
     }
 
     private void atualizarVelocidade() {
