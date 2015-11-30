@@ -1,6 +1,9 @@
 package br.grupointegrado.flappyBird;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Preferences;
+import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -34,6 +37,9 @@ import com.badlogic.gdx.utils.viewport.FillViewport;
  */
 public class TelaJogo extends TelaBase {
 
+    private static final String PREF_FLAPPY_BIRD = "PREF_FLAPPY_BIRD";
+    private static final String PREF_MAIOR_PONTUACAO = "PREF_MAIOR_PONTUACAO";
+
     private OrthographicCamera camera; //camera do jogo
     private World mundo; // representa o mundo do Box2D
     private Body chao; // corpo do chão no jogo
@@ -42,8 +48,10 @@ public class TelaJogo extends TelaBase {
 
     private int pontuacao = 0;
     private BitmapFont fontePontuacao;
+    private BitmapFont fonte;
     private Stage palcoInformacoes;
     private Label lbPontuacao;
+    private Label lbMaiorPontuacao;
     private ImageButton btnPlay;
     private ImageButton btnGameOver;
     private OrthographicCamera cameraInfo;
@@ -63,7 +71,11 @@ public class TelaJogo extends TelaBase {
 
     private boolean jogoIniciado = false;
 
-    private Box2DDebugRenderer debug; //Desenha o mundo na tela para ajudar no desenvolvimento
+    private Music musicaFundo;
+    private Sound somAsas;
+    private Sound somGameOver;
+
+    private Box2DDebugRenderer debug; //Desenha o mundo na tela para ajudar no desenvolvimento do jogo
 
 
 
@@ -106,6 +118,14 @@ public class TelaJogo extends TelaBase {
         initPassaro();
         initFontes();
         initInformacoes();
+        initAudio();
+    }
+
+    private void initAudio() {
+        musicaFundo = Gdx.audio.newMusic(Gdx.files.internal("songs/music.mp3"));
+        musicaFundo.setLooping(true);
+        somAsas = Gdx.audio.newSound(Gdx.files.internal("songs/wing.ogg"));
+        somGameOver = Gdx.audio.newSound(Gdx.files.internal("songs/game-over.mp3"));
     }
 
     private void initTexturas() {
@@ -134,13 +154,28 @@ public class TelaJogo extends TelaBase {
     private void detectarColisao(Fixture fixtureA, Fixture fixtureB) {
         if ("PASSARO".equals(fixtureA.getUserData()) || "PASSARO".equals(fixtureB.getUserData())){
             //game over
+            if (!gameOver){
+                somGameOver.play(1); //100% do volume
+            }
+
             gameOver = true;
+            salvarPontuacao();
+        }
+    }
+
+    private void salvarPontuacao() {
+        Preferences pref = Gdx.app.getPreferences(PREF_FLAPPY_BIRD);
+        int maiorPontuacao = pref.getInteger(PREF_MAIOR_PONTUACAO, 0); //caso não haja pontuação retornará 0
+        if (pontuacao > maiorPontuacao){
+            pref.putInteger(PREF_MAIOR_PONTUACAO, pontuacao);//pega a maior pontuação
+            pref.flush();//salva a pontuação
         }
     }
 
     private void initFontes() {
         FreeTypeFontGenerator.FreeTypeFontParameter fonteParam = new FreeTypeFontGenerator.FreeTypeFontParameter();
 
+        //FONTE PONTUAÇÃO DO JOGO
         fonteParam.size = 56;
         fonteParam.color = Color.WHITE;
         fonteParam.shadowColor = Color.BLACK;
@@ -149,6 +184,16 @@ public class TelaJogo extends TelaBase {
 
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/roboto.ttf"));
         fontePontuacao = gerador.generateFont(fonteParam);
+
+        //FONTE MAIOR PONTUAÇÃO
+        fonteParam.size = 24;
+        fonteParam.color = Color.WHITE;
+        fonteParam.shadowColor = Color.BLACK;
+        fonteParam.shadowOffsetX = 2;
+        fonteParam.shadowOffsetY = 2;
+
+        fonte = gerador.generateFont(fonteParam);
+
         gerador.dispose();
     }
 
@@ -168,7 +213,7 @@ public class TelaJogo extends TelaBase {
         estiloBotao.up = new SpriteDrawable(new Sprite(texturaPlay));
 
         btnPlay = new ImageButton(estiloBotao);
-        btnPlay.addListener(new ClickListener(){
+        btnPlay.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 jogoIniciado = true;
@@ -180,13 +225,23 @@ public class TelaJogo extends TelaBase {
         estiloBotao.up = new SpriteDrawable(new Sprite(texturaGameOver));
 
         btnGameOver = new ImageButton(estiloBotao);
-        btnGameOver.addListener(new ClickListener(){
+        btnGameOver.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 reiniciarJogo();
             }
         });
         palcoInformacoes.addActor(btnGameOver);
+
+        //ADICIONANDO MAIOR PONTUAÇÃO NO PALCO
+        Preferences pref = Gdx.app.getPreferences(PREF_FLAPPY_BIRD);
+        int maiorPontuacao = pref.getInteger(PREF_MAIOR_PONTUACAO, 0);
+
+        estilo = new Label.LabelStyle();
+        estilo.font = fonte;
+
+        lbMaiorPontuacao = new Label("Maior: " + maiorPontuacao, estilo);
+        palcoInformacoes.addActor(lbMaiorPontuacao);
     }
 
     /**
@@ -268,6 +323,13 @@ public class TelaJogo extends TelaBase {
      * @param delta
      */
     private void atualizar(float delta) {
+        if (gameOver && musicaFundo.isPlaying()){
+            musicaFundo.stop();
+        } else if(!gameOver && !musicaFundo.isPlaying()){
+            musicaFundo.setVolume(0.1f); //10% do volume
+            musicaFundo.play();
+        }
+
         palcoInformacoes.act(delta);
         
         passaro.getCorpo().setFixedRotation(!gameOver);
@@ -286,14 +348,19 @@ public class TelaJogo extends TelaBase {
         }
 
         if(pulando && !gameOver && jogoIniciado){
+            somAsas.play(1); //100% do som
             passaro.pular();
         }
     }
 
     private void atualizarInformacoes() {
+        lbMaiorPontuacao.setPosition(10, cameraInfo.viewportHeight - lbMaiorPontuacao.getPrefHeight());
+        lbMaiorPontuacao.setVisible(!jogoIniciado);
+
         lbPontuacao.setText(pontuacao + "");
         lbPontuacao.setPosition(cameraInfo.viewportWidth / 2 - lbPontuacao.getPrefWidth() / 2,
                 cameraInfo.viewportHeight - lbPontuacao.getPrefHeight());
+        lbPontuacao.setVisible(jogoIniciado);
 
         btnPlay.setPosition(cameraInfo.viewportWidth / 2 - btnPlay.getPrefWidth() / 2,
                 cameraInfo.viewportHeight / 2 - btnPlay.getPrefHeight() * 2
@@ -404,6 +471,7 @@ public class TelaJogo extends TelaBase {
         palcoInformacoes.dispose();
         pincel.dispose();
         fontePontuacao.dispose();
+        fonte.dispose();
         texturasPassaro[0].dispose();
         texturasPassaro[1].dispose();
         texturasPassaro[2].dispose();
@@ -413,5 +481,8 @@ public class TelaJogo extends TelaBase {
         texturaChao.dispose();
         texturaPlay.dispose();
         texturaGameOver.dispose();
+        musicaFundo.dispose();
+        somAsas.dispose();
+        somGameOver.dispose();
     }
 }
